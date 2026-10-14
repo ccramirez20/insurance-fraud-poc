@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Insurance Fraud AI - POC</title>
+
+<!-- =======================  PALETA  #4A0D29  ======================= -->
+<style>
+:root{
+  --accent:#4A0D29;                 /* borgoña principal                */
+  --bg-dark:#ebe5e7;
+  --bg-panel:#4A0D29;
+  --bg-card:#b9a6af;                /* caja de chat blanca              */
+  --bg-msg-user:#4A0D29;            /* burbuja del usuario              */
+  --bg-msg-bot:#f3f4f6;             /* gris claro respuesta IA          */
+  --text-dark:#1e1e1e;
+  --text-light:#f9fafb;
+  --text-muted:#9ca3af;
+  --radius:8px;
+  --font:'Inter',sans-serif;
+  --risk-high:#dc2626;
+  --risk-medium:#f59e0b;
+  --risk-low:#22c55e;
+  --dropbox:#cfc5ca;
+  --boton:#a16f87;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{display:flex;flex-direction:column;background:var(--bg-dark);color:var(--text-light);font-family:var(--font)}
+/* ------------------  ENCABEZADO  ------------------ */
+header{
+  height:60px;padding:0 1.5rem;background:var(--bg-panel);
+  display:flex;align-items:center;gap:1rem
+}
+.logo{height:32px}
+header h1{font-size:1.25rem;color:var(--accent)}
+
+/* ------------------  CONTENEDORES  ----------------- */
+.app-wrapper{flex:1;display:flex;gap:1rem;padding:1rem;overflow:hidden}
+aside.sidebar,main.chat-panel{
+  background:var(--bg-panel);border-radius:var(--radius);
+  box-shadow:0 2px 8px rgba(0,0,0,.5);overflow:hidden
+}
+aside.sidebar{width:340px;max-width:100%;display:flex;flex-direction:column}
+
+.section{background:var(--bg-panel);margin:1rem;padding:1rem;border-radius:var(--radius)}
+.section h4{margin-bottom:.75rem;color:var(--text-muted);font-size:1rem}
+
+/* --------  DROP‑BOX PARA AUDIOS  -------- */
+.file-uploader{
+  border:2px dashed var(--dropbox);border-radius:var(--radius);
+  padding:3rem 2rem;min-height:180px;text-align:center;
+  color:var(--text-muted);cursor:pointer;
+  transition:.3s background,.3s transform
+}
+.file-uploader.dragover{background:rgba(212, 152, 178, 0.15);transform:scale(1.05)}
+.file-uploader i{font-size:2rem;color:var(--accent)}
+.file-uploader p{margin-top:.5rem}
+.file-uploader input{display:none}
+
+/* ----------  BOTÓN CARGAR JSON  ---------- */
+.accent-btn{
+  width:100%;margin-top:1rem;
+  background:var(--boton);color:#fff;
+  border:none;border-radius:var(--radius);padding:.8rem 1rem;
+  font-size:.9rem;cursor:pointer;transition:opacity .2s
+}
+.accent-btn:hover{opacity:.85}
+
+/* ----------  LISTA ARCHIVOS  --------------- */
+.file-list{margin-top:1rem;max-height:calc(100vh - 320px);overflow-y:auto;overflow-x:hidden}
+.file-list::-webkit-scrollbar{width:6px}
+.file-list::-webkit-scrollbar-thumb{background:var(--text-muted);border-radius:3px}
+
+.file-item{
+  background:var(--bg-panel);padding:.8rem;border-radius:var(--radius);
+  display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  margin-bottom:.75rem;font-size:.9rem;transition:.3s transform
+}
+.file-item:hover{transform:translateX(4px)}
+.file-item.checked{background:rgba(25, 255, 4, 0.08)}
+.file-item.risk-high{border-left:4px solid var(--risk-high)}
+.file-item.risk-medium{border-left:4px solid var(--risk-medium)}
+.file-item.risk-low{border-left:4px solid var(--risk-low)}
+
+.file-check{
+  appearance:none;width:20px;height:20px;border:2px solid var(--text-muted);
+  border-radius:4px;cursor:pointer;flex-shrink:0;
+  transition:.3s background,.3s border-color
+}
+.file-check:checked{background:var(--risk-low);border-color:var(--risk-low)}
+.file-check:checked::after{content:'✔';position:absolute;top:1px;left:4px;font-size:12px;color:#fff}
+
+.file-name{flex:1 1 auto;word-break:break-all}
+.risk-label{font-size:.75rem;color:var(--text-muted);white-space:nowrap;margin-right:auto}
+
+.file-item button{
+  background:var(--accent);           /* antes: transparente             */
+  color:#fff;                         /* texto blanco                    */
+  border:none;                        /* sin borde                       */
+  padding:.45rem .9rem;
+  border-radius:var(--radius);
+  font-size:.85rem;
+  cursor:pointer;
+  transition:opacity .2s;
+}
+.file-item button:hover{opacity:.85}
+
+/* ----------------  CHAT  ------------------- */
+main.chat-panel{flex:1;display:flex;flex-direction:column;position:relative}
+#chatbox{
+  flex:1;margin:1rem;padding:1rem;
+  background:var(--bg-card);color:var(--text-dark);
+  border-radius:var(--radius);display:flex;flex-direction:column;gap:.75rem;overflow-y:auto
+}
+.msg{
+  max-width:70%;padding:.75rem 1rem;border-radius:var(--radius);
+  font-size:.9rem;line-height:1.4;opacity:0;animation:fadeInUp .3s forwards
+}
+.msg.user{background:var(--bg-msg-user);color:#fff;align-self:flex-end}
+.msg.bot{background:var(--bg-msg-bot);color:var(--text-dark);align-self:flex-start}
+.msg::after{
+  content:attr(data-time);position:absolute;bottom:-1.2rem;right:.5rem;
+  color:var(--text-muted);font-size:.65rem
+}
+
+/* entrada de texto */
+.chat-input{
+  display:flex;align-items:center;gap:.5rem;padding:1rem;
+  background:var(--accent);margin:0 1rem 1rem;border-radius:var(--radius)
+}
+.chat-input input{
+  flex:1;padding:.75rem 1rem;border:none;border-radius:var(--radius);
+  background:#fff;color:var(--text-dark);font-size:.9rem
+}
+.chat-input button{
+  background:#fff;color:var(--accent);border:none;
+  padding:.75rem 1rem;border-radius:var(--radius);cursor:pointer;font-size:.9rem;
+  transition:opacity .2s
+}
+.chat-input button:hover{opacity:.85}
+
+/* loader y modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:1000}
+.overlay.active{display:flex}
+.loader{width:48px;height:48px;border:5px solid var(--text-muted);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:.3s;z-index:1001}
+.modal-overlay.active{opacity:1;visibility:visible}
+.modal{
+  background:var(--bg-card);color:var(--text-dark);
+  border-radius:var(--radius);padding:1.5rem;max-width:400px;width:80%;max-height:70%;overflow-y:auto;
+  transform:translateY(-20px);transition:.3s
+}
+.modal-overlay.active .modal{transform:translateY(0)}
+.modal-close{position:absolute;top:.5rem;right:.75rem;background:none;border:none;font-size:1.5rem;color:var(--text-muted);cursor:pointer}
+.modal h2{margin-bottom:1rem;color:var(--accent);font-size:1.1rem}
+.modal p{white-space:pre-wrap}
+
+@media(max-width:768px){
+  .app-wrapper{flex-direction:column}
+  .file-item{font-size:.8rem}
+  .file-item button{padding:.3rem .6rem;font-size:.8rem}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Chatbot Seguros AI</h1>
+</header>
+
+<div class="app-wrapper">
+  <!-- =============  SIDEBAR  ============= -->
+  <aside class="sidebar">
+    <div class="section">
+      <h4>Archivos Analizados</h4>
+
+      <!--  Drop‑box Audio  -->
+      <div id="fileUploader" class="file-uploader">
+        <i class="fas fa-file-upload"></i>
+        <p>Arrastra o haz clic</p>
+        <input id="audioInput" type="file" accept="audio/*">
+      </div>
+
+      <!--  Botón cargar JSON guardados  -->
+      <button id="loadJsonBtn" class="accent-btn">
+        Cargar análisis guardados
+      </button>
+
+      <div id="fileList" class="file-list"></div>
+    </div>
+  </aside>
+
+  <!-- =============  CHAT  ============== -->
+  <main class="chat-panel">
+    <div id="chatbox">
+      <div class="msg bot" data-time="--:--">
+        👋 Hola, soy tu asistente de fraudes de seguros. Sube un audio o carga un análisis guardado.
+      </div>
+    </div>
+
+    <div id="overlay" class="overlay"><div class="loader"></div></div>
+
+    <div class="chat-input">
+      <input id="userInput" type="text" placeholder="Escribe tu mensaje…">
+      <button onclick="enviarTexto()">Enviar</button>
+    </div>
+  </main>
+</div>
+
+<!-- ================  MODAL  ================= -->
+<div id="modalOverlay" class="modal-overlay">
+  <div class="modal">
+    <button id="modalClose" class="modal-close">&times;</button>
+    <h2>Resumen</h2>
+    <p id="modalContent"></p>
+  </div>
+</div>
+
+<script src="https://kit.fontawesome.com/a2e1d3f6f8.js" crossorigin="anonymous"></script>
+<script>
+/* ------------------  ESTADO GLOBAL  ------------------ */
+const chatHistory   =[ {role:'system',content:'Eres un asistente de fraudes de seguros con IA generativa.'} ];
+const archivos      ={};                // { nombre : {summary,raw,classification} }
+const selectedFiles =new Set();
+
+/* ------------------  ELEMENTOS  ---------------------- */
+const overlay      =document.getElementById('overlay');
+const modalOverlay =document.getElementById('modalOverlay');
+const modalClose   =document.getElementById('modalClose');
+const modalContent =document.getElementById('modalContent');
+
+/* ------------------  UTILS VISUALES  ----------------- */
+const showLoader=()=>overlay.classList.add('active');
+const hideLoader=()=>overlay.classList.remove('active');
+
+function agregarMensaje(txt,clase){
+  const hora=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const div=document.createElement('div');
+  div.className=`msg ${clase}`;div.textContent=txt;div.dataset.time=hora;
+  const chat=document.getElementById('chatbox');
+  chat.appendChild(div);chat.scrollTop=chat.scrollHeight;
+}
+
+/* ------------------  ENVIAR TEXTO -------------------- */
+async function enviarTexto(){
+  const input=document.getElementById('userInput');
+  const texto=input.value.trim();if(!texto)return;
+  agregarMensaje(texto,'user');input.value='';
+
+  const useFiles=selectedFiles.size>0;
+  let messages;
+  if(useFiles){
+    showLoader();
+    messages=[
+      ...Array.from(selectedFiles).map(name=>({
+        role:'system',
+        content:`Resumen del audio "${name}": ${archivos[name].summary}`
+      })),
+      {role:'user',content:texto}
+    ];
+  }else{
+    chatHistory.push({role:'user',content:texto});
+    messages=chatHistory;
+  }
+
+  const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});
+  const {reply}=await res.json();
+  if(useFiles)hideLoader();
+  agregarMensaje(reply,'bot');
+  if(!useFiles)chatHistory.push({role:'assistant',content:reply});
+}
+
+document.getElementById('userInput')
+  .addEventListener('keydown',e=>{if(e.key==='Enter')enviarTexto()});
+
+/* ------------------  DROP AUDIO ---------------------- */
+const uploader=document.getElementById('fileUploader');
+const audioInput=document.getElementById('audioInput');
+uploader.onclick=()=>audioInput.click();
+uploader.ondragover=e=>{e.preventDefault();uploader.classList.add('dragover')};
+uploader.ondragleave=()=>uploader.classList.remove('dragover');
+uploader.ondrop=e=>{e.preventDefault();uploader.classList.remove('dragover');audioInput.files=e.dataTransfer.files;enviarAudio()};
+audioInput.onchange=enviarAudio;
+
+async function enviarAudio () {
+  const file = audioInput.files[0];
+  if (!file) return;
+
+  agregarMensaje(`Audio: ${file.name}`, 'user');
+  showLoader();
+
+  const fd  = new FormData();
+  fd.append('file', file);
+  const { summary } = await fetch('/summarize', { method: 'POST', body: fd })
+                            .then(r => r.json());
+
+  hideLoader();
+
+  /* ── detectamos la clasificación ───────────────────────────── */
+  const m   = summary.match(/Clasificaci[oó]n de riesgo:\s*(Alta|Media|Baja)/i);
+  const raw = m ? m[1] : 'Baja';
+  const classification =
+        raw.toLowerCase() === 'alta'   ? 'high'   :
+        raw.toLowerCase() === 'media'  ? 'medium' : 'low';
+
+  /* ── id único (por si se suben dos archivos con el mismo nombre) ── */
+  const audioId = crypto.randomUUID();
+
+  archivos[audioId] = {
+    filename : file.name,          // ← ahora siempre existe
+    summary,
+    raw,
+    classification
+  };
+
+  renderFileList();
+  audioInput.value = '';
+}
+
+
+/* -------------  CARGAR JSON LOCALES  --------------- */
+document.getElementById('loadJsonBtn').onclick=loadSavedAnalysis;
+
+async function loadSavedAnalysis(){
+  try{
+    showLoader();
+    /* 1. pedimos lista */
+    const lista=await fetch('/analisis').then(r=>r.json());
+    for(const item of lista.analisis){
+      const {id,filename}=item;
+      if(archivos[id])continue;                              // ya cargado
+      /* 2. descargamos JSON */
+      const data=await fetch(`/analisis/${id}`).then(r=>r.json());
+
+      let raw=data.clasificacion||data.classification;
+      if(!raw){
+        const match=(data.resumen||data.summary||'').match(/Clasificaci[oó]n de riesgo:\s*(Alta|Media|Baja)/i);
+        raw=match?match[1]:'Baja';
+      }
+      const classification=raw.toLowerCase()==='alta'?'high':raw.toLowerCase()==='media'?'medium':'low';
+
+      archivos[id]={
+        filename:filename || id,         // mostramos filename
+        summary: data.resumen || data.summary || '',
+        raw,
+        classification
+      };
+    }
+    renderFileList();
+  }catch(e){alert('Error al cargar: '+e.message)}
+  finally{hideLoader();}
+}
+
+/* -------------  RENDER LISTA ----------------------- */
+function renderFileList(){
+  const list=document.getElementById('fileList');list.innerHTML='';selectedFiles.clear();
+  Object.entries(archivos).forEach(([id,data])=>{
+    const {filename,raw,classification}=data;
+    const item=document.createElement('div');
+    item.className=`file-item risk-${classification}`;
+    item.innerHTML=`
+      <input type="checkbox" class="file-check" data-id="${id}">
+      <span class="file-name">${filename}</span>
+      <span class="risk-label">${raw}</span>
+      <button onclick="openModal('${id}')">Ver resumen</button>`;
+    list.appendChild(item);
+  });
+  list.querySelectorAll('.file-check').forEach(chk=>{
+    chk.onchange=()=>{
+      const id=chk.dataset.id;
+      chk.closest('.file-item').classList.toggle('checked',chk.checked);
+      chk.checked?selectedFiles.add(id):selectedFiles.delete(id);
+    }
+  });
+}
+
+/* -------------  MODAL RESUMEN ---------------------- */
+function openModal(n){modalContent.textContent=archivos[n].summary;modalOverlay.classList.add('active')}
+modalClose.onclick=()=>modalOverlay.classList.remove('active');
+modalOverlay.onclick=e=>{if(e.target===modalOverlay)modalOverlay.classList.remove('active')};
+</script>
+</body>
+</html>

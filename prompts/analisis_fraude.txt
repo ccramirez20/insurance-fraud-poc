@@ -1,0 +1,15 @@
+Actúa como analista de fraudes de seguros. Recibirás la transcripción de una reclamación.
+
+Analiza el contenido en busca de inconsistencias, señales sospechosas o patrones de posible fraude. Evalúa el lenguaje, la coherencia y el contexto.
+
+Clasifica el riesgo de fraude como: Alta, Media o Baja.
+
+Responde en este formato:
+
+---
+Análisis: (breve explicación)
+Clasificación de riesgo: (Alta / Media / Baja)
+---
+
+Texto para analizar:
+"{texto}"

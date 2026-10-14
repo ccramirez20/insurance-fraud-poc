@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Agente de Análisis de Fraude</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            margin: 0;
+            padding: 0;
+        }
+        #chatbox {
+            padding: 20px;
+            background: white;
+            min-height: 90vh;
+            overflow-y: auto;
+        }
+        .msg {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 75%;
+        }
+        .user {
+            background: #d1e7dd;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .bot {
+            background: #e2e3e5;
+            align-self: flex-start;
+            margin-right: auto;
+        }
+        .input-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        input[type="text"] {
+            width: 60%;
+            padding: 10px;
+            font-size: 16px;
+        }
+        input[type="file"] {
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            background: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0b5ed7;
+        }
+    </style>
+</head>
+<body>
+
+    <div style="display: flex; max-width: 1200px; margin: auto;">
+        <!-- Chat principal -->
+        <div id="chatbox" style="flex: 3; padding: 20px; background: white; min-height: 90vh;">
+            <div class="msg bot">👋 Hola, soy tu asistente de análisis de fraude. Puedes escribir o enviar un audio.</div>
+        </div>
+    
+        <!-- Panel lateral de archivos -->
+        <div style="flex: 1; background: #f0f0f0; padding: 20px; border-left: 1px solid #ccc;">
+            <h4>Archivos Analizados</h4>
+            <select id="fileList" onchange="mostrarArchivoSeleccionado()" style="width: 100%; padding: 10px;">
+                <option value="">Selecciona un archivo</option>
+            </select>
+            <div id="fileInfo" style="margin-top: 10px; font-size: 14px; white-space: pre-wrap;"></div>
+        </div>
+    </div>
+
+    <div class="input-container">
+        <input type="text" id="userInput" placeholder="Escribe tu mensaje..." />
+        <button onclick="enviarTexto()">Enviar Texto</button>
+        <input type="file" id="audioInput" accept="audio/*">
+        <button onclick="enviarAudio()">Enviar Audio</button>
+    </div>
+
+    <script>
+        let chatHistory = [
+            { role: "system", content: "Eres un asistente experto en detectar posibles fraudes de seguros para la compañia SURA a partir de conversaciones o mensajes de audio." }
+        ];
+
+        function agregarMensaje(texto, clase) {
+            const msgDiv = document.createElement("div");
+            msgDiv.className = `msg ${clase}`;
+            msgDiv.innerText = texto;
+            document.getElementById("chatbox").appendChild(msgDiv);
+            document.getElementById("chatbox").scrollTop = document.getElementById("chatbox").scrollHeight;
+        }
+
+        async function enviarTexto() {
+            const input = document.getElementById("userInput");
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            agregarMensaje("Usuario: " + msg, "user");
+            chatHistory.push({ role: "user", content: msg });
+
+            const response = await fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: chatHistory })
+            });
+
+            const data = await response.json();
+            agregarMensaje("Bot: " + data.reply, "bot");
+            chatHistory.push({ role: "assistant", content: data.reply });
+
+            input.value = "";
+        }
+        let archivosAnalizados = {};
+
+        function actualizarDropdown() {
+            const dropdown = document.getElementById("fileList");
+            dropdown.innerHTML = '<option value="">Selecciona un archivo</option>';
+            for (const nombre in archivosAnalizados) {
+                const option = document.createElement("option");
+                option.value = nombre;
+                option.textContent = nombre;
+                dropdown.appendChild(option);
+            }
+        }
+
+        function mostrarArchivoSeleccionado() {
+            const selected = document.getElementById("fileList").value;
+            const infoDiv = document.getElementById("fileInfo");
+            if (selected && archivosAnalizados[selected]) {
+                infoDiv.innerText = "Resumen:\n" + archivosAnalizados[selected];
+            } else {
+                infoDiv.innerText = "";
+            }
+        }
+
+        async function enviarAudio() {
+            const input = document.getElementById("audioInput");
+            const file = input.files[0];
+            if (!file) return alert("Por favor, selecciona un archivo de audio.");
+
+            agregarMensaje(`Usuario envió un audio: "${file.name}"`, "user");
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const response = await fetch("/summarize", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+
+            // Mostrar transcripción y resumen como parte de la conversación
+            chatHistory.push({ role: "user", content: `Audio transcrito: ${data.transcription}` });
+            chatHistory.push({ role: "assistant", content: data.summary });
+
+            agregarMensaje("Bot (análisis): " + data.summary, "bot");
+            
+            archivosAnalizados[file.name] = data.summary;
+            actualizarDropdown();
+
+            // Limpiar input
+            input.value = "";
+        }
+    </script>
+</body>
+</html>
